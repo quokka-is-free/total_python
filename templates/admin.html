@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>출장 관리</title>
+    <!-- DataTables & jQuery -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.3.6/css/buttons.dataTables.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.html5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background: #f9f9f9; padding: 20px; }
+        .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); margin-bottom: 30px; }
+        input, select, button { padding: 10px; margin: 5px; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #4d79ec; color: white; cursor: pointer; }
+        button:hover { background: #3b5cd8; }
+        .delete-btn { background: #ff5c5c; }
+        .delete-btn:hover { background: #cc4a4a; }
+        h1, h2 { text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h1 style="margin: 0;">출장 관리</h1>
+            <form method="GET" action="/logout" style="margin: 0;">
+                <button type="submit" style="background: #ff5c5c; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">로그아웃</button>
+            </form>
+        </div>
+
+        <!-- 사용자 등록 폼 -->
+        <form method="POST" action="/admin_trips">
+            <input type="text" name="user_id" placeholder="사용자 ID" required>
+            <input type="text" name="username" placeholder="사용자명" required>
+            <input type="password" name="password" placeholder="비밀번호" required>
+            <input type="text" name="department" placeholder="부서" required>
+            <select name="workplace" required>
+                <option value="논산">논산</option>
+                <option value="대전">대전</option>
+                <option value="수원">수원</option>
+            </select>
+            <select name="position" required>
+                <option value="">직급 선택</option>
+                <option>사원</option><option>주임</option><option>대리</option>
+                <option>과장</option><option>수석</option><option>연구원</option>
+                <option>주임연구원</option><option>선임연구원</option><option>수석연구원</option>
+            </select>
+            <input type="email" name="email" placeholder="이메일" required>
+            <button type="submit">등록</button>
+        </form>
+
+        <!-- 등록된 사용자 테이블 -->
+        <h2>등록된 사용자</h2>
+        <table id="usersTable" class="display">
+            <thead>
+                <tr>
+                    <th>사용자ID</th>
+                    <th>사용자명</th>
+                    <th>비밀번호</th>
+                    <th>부서</th>
+                    <th>근무지</th>
+                    <th>직급</th>
+                    <th>이메일</th>
+                    <th>등록일</th>
+                    <th>삭제</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>{{ user[0] }}</td>
+                    <td>{{ user[1] }}</td>
+                    <td>{{ user[2] }}</td>
+                    <td>{{ user[3] }}</td>
+                    <td>{{ user[4] if user[4] else '논산' }}</td>
+                    <td>{{ user[5] }}</td>
+                    <td>{{ user[6] }}</td>
+                    <td>{{ user[7] }}</td>
+                    <td>
+                        <form method="POST" action="/delete_user" style="display:inline;">
+                            <input type="hidden" name="user_id" value="{{ user[0] }}">
+                            <button type="submit" class="delete-btn" onclick="return confirm('정말 삭제하시겠습니까?');">삭제</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 시내출장 신청 내역 -->
+    <div class="container">
+        <h2>시내출장 신청 내역</h2>
+        <label>시작일: <input type="date" id="startDateLocal"></label>
+        <label>종료일: <input type="date" id="endDateLocal"></label>
+        <button id="filterLocal">검색</button>
+        <table id="localTrips" class="display">
+            <thead>
+                <tr>
+                    <th>사용자명</th><th>신청일시</th><th>출장일자</th><th>출발시간</th><th>출발지</th><th>도착지</th><th>목적</th><th>차량번호</th><th>거리(KM)</th><th>삭제</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in local_trips %}
+                <tr>
+                    <td>{{ row[0] }}</td><td>{{ row[1] }}</td><td>{{ row[2] }}</td><td>{{ row[3] }}</td><td>{{ row[4] }}</td><td>{{ row[5] }}</td><td>{{ row[6] }}</td><td>{{ row[7] }}</td><td>{{ row[8] }}</td>
+                    <td>
+                        <form method="POST" action="/delete_local_trip" style="display:inline;">
+                            <input type="hidden" name="submit_time" value="{{ row[1] }}">
+                            <button type="submit" class="delete-btn" onclick="return confirm('이 출장 내역을 삭제하시겠습니까?');">삭제</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 시외출장 신청 내역 -->
+    <div class="container">
+        <h2>시외출장 신청 내역</h2>
+        <label>시작일: <input type="date" id="startDateOutdoor"></label>
+        <label>종료일: <input type="date" id="endDateOutdoor"></label>
+        <button id="filterOutdoor">검색</button>
+        <table id="outdoorTrips" class="display">
+            <thead>
+                <tr>
+                    <th>사용자명</th><th>신청일시</th><th>출장일자</th><th>출발시간</th><th>출발지</th><th>도착지</th><th>목적</th><th>차량번호</th><th>거리(KM)</th><th>삭제</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in outdoor_trips %}
+                <tr>
+                    <td>{{ row[0] }}</td><td>{{ row[1] }}</td><td>{{ row[2] }}</td><td>{{ row[3] }}</td><td>{{ row[4] }}</td><td>{{ row[5] }}</td><td>{{ row[6] }}</td><td>{{ row[7] }}</td><td>{{ row[8] }}</td>
+                    <td>
+                        <form method="POST" action="/delete_outdoor_trip" style="display:inline;">
+                            <input type="hidden" name="submit_time" value="{{ row[1] }}">
+                            <button type="submit" class="delete-btn" onclick="return confirm('이 출장 내역을 삭제하시겠습니까?');">삭제</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            $('#usersTable').DataTable({
+                dom: 'Bfrtip',
+                buttons: ['csv', 'excel', 'pdf']
+            });
+
+            $('#localTrips').DataTable({
+                dom: 'Bfrtip',
+                buttons: ['csv', 'excel', 'pdf']
+            });
+
+            $('#outdoorTrips').DataTable({
+                dom: 'Bfrtip',
+                buttons: ['csv', 'excel', 'pdf']
+            });
+        });
+    </script>
+</body>
+</html>

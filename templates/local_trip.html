@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>시내출장 신청</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.3.6/css/buttons.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/select/1.7.0/css/select.dataTables.min.css">
+    <style>
+        body { background-color: #f8f9fa; }
+        .container { max-width: 800px; margin-top: 50px; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h2 { text-align: center; margin-bottom: 20px; }
+        .form-buttons { display: flex; gap: 10px; }
+        .tooltip-icon { cursor: pointer; color: #007bff; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>시내출장 신청</h2>
+
+    {% if error_message %}
+    <div class="alert alert-danger">{{ error_message }}</div>
+    {% endif %}
+
+    <form method="POST" class="mb-4" onsubmit="return validateForm()">
+        <div class="mb-3">
+            <label for="trip_date" class="form-label">출장일자</label>
+            <input type="date" id="trip_date" name="trip_date" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label for="departure_time" class="form-label">출발시간</label>
+            <input type="time" id="departure_time" name="departure_time" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label for="origin" class="form-label">출발지 <small class="text-muted tooltip-icon" data-bs-toggle="tooltip" data-bs-placement="right" title="IC(예: 논산IC) 또는 지역(예: 대전)을 입력하세요">[도움말]</small></label>
+            <input type="text" id="origin" name="origin" class="form-control" required placeholder="예: 논산IC, 논산">
+        </div>
+        <div class="mb-3">
+            <label for="destination" class="form-label">도착지 <small class="text-muted tooltip-icon" data-bs-toggle="tooltip" data-bs-placement="right" title="IC(예: 서울IC) 또는 지역(예: 서울)을 입력하세요">[도움말]</small></label>
+            <input type="text" id="destination" name="destination" class="form-control" required placeholder="예: 서울IC, 서울">
+        </div>
+        <div class="mb-3">
+            <label for="car_number" class="form-label">차량번호</label>
+            <input type="text" id="car_number" name="car_number" class="form-control" required placeholder="예: 123가4567">
+        </div>
+        <div class="mb-3">
+            <label for="purpose" class="form-label">출장목적</label>
+            <input type="text" id="purpose" name="purpose" class="form-control" required placeholder="예: 교육등">
+        </div>
+
+        <div class="form-buttons mt-2">
+            <button type="submit" class="btn btn-primary flex-fill">신청</button>
+        </div>
+    </form>
+
+    <h4>신청 내역</h4>
+    <table id="localTripTable" class="table table-bordered table-sm display nowrap">
+        <thead class="table-light">
+        <tr>
+            <th>선택</th>
+            <th>사용자명</th>
+            <th>신청일시</th>
+            <th>출장일자</th>
+            <th>출발시간</th>
+            <th>출발지</th>
+            <th>도착지</th>
+            <th>거리(KM)</th>
+            <th>목적</th>
+            <th>차량번호</th>
+            <th>여비정산</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for trip in trips %}
+        <tr>
+            <td><input type="checkbox" class="row-select"></td>
+            <td>{{ trip[0] }}</td>
+            <td>{{ trip[1] }}</td>
+            <td>{{ trip[2] }}</td>
+            <td>{{ trip[3] }}</td>
+            <td>{{ trip[4] }}</td>
+            <td>{{ trip[7] }}</td>
+            <td>{{ trip[8] }}</td>
+            <td>{{ trip[6] }}</td>
+            <td>{{ trip[5] }}</td>
+            <td>
+                <button type="button" class="btn btn-sm btn-secondary"
+                    onclick="openExpenseClaimFromRow('{{ trip[2] }}', '{{ trip[4] }}', '{{ trip[7] }}', '{{ trip[5] }}', '{{ trip[6] }}')">
+                    여비정산하기
+                </button>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.print.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
+
+<script>
+let isNavigating = false;
+
+function validateForm() {
+    const origin = document.querySelector('input[name="origin"]').value;
+    const destination = document.querySelector('input[name="destination"]').value;
+    if (!origin.trim() || !destination.trim()) {
+        alert("출발지와 목적지를 모두 입력해주세요.");
+        return false;
+    }
+    isNavigating = true;  // 폼 제출로 페이지 이동 중임을 표시
+    return true;
+}
+
+function openExpenseClaimFromRow(trip_date, origin, destination, car_number, purpose) {
+    isNavigating = true;  // 버튼 클릭으로 페이지 이동 중임을 표시
+    const url = `/expense_claim?trip_date=${encodeURIComponent(trip_date)}&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&car_number=${encodeURIComponent(car_number)}&purpose=${encodeURIComponent(purpose)}`;
+    window.open(url, '여비정산', 'width=600,height=700');
+}
+
+// 창이 닫힐 때 로그아웃 요청 보내기
+window.addEventListener('beforeunload', function(event) {
+    // 버튼 클릭 또는 폼 제출로 페이지 이동 중이라면 로그아웃 요청을 보내지 않음
+    if (!isNavigating) {
+        fetch('/logout', {
+            method: 'GET',
+            keepalive: true  // 네트워크 요청이 비동기적으로 완료되도록 설정
+        });
+    }
+});
+
+$(document).ready(function() {
+    $('#localTripTable').DataTable({
+        dom: 'Bfrtip',
+        buttons: [
+            { extend: 'csv', text: 'CSV 다운로드' },
+            { extend: 'excel', text: 'Excel 다운로드' },
+            { extend: 'pdf', text: 'PDF 다운로드' }
+        ],
+        responsive: true,
+        scrollX: true
+    });
+
+    // Bootstrap tooltip 초기화
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+</body>
+</html>
