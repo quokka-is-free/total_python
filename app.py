@@ -10,7 +10,6 @@ import pandas as pd
 from werkzeug.utils import secure_filename
 import shutil
 
-# [보안 1] 환경 변수 로드
 load_dotenv()
 
 app = Flask(__name__)
@@ -25,7 +24,6 @@ else:
 
 api_key = os.getenv('KAKAO_API_KEY')
 
-# [보안 3] 세션 보안 설정
 app.config['PERMANENT_SESSION_LIFETIME'] = 600
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
@@ -361,15 +359,13 @@ def admin_attendance():
     if not session.get('logged_in') or session.get('username') != 'admin':
         return redirect(url_for('admin_dashboard'))
 
-    # 초기 데이터 로드
     attendance_data = []
     try:
         with open('attendance.csv', 'r', encoding='utf-8') as f:
             attendance_data = list(csv.reader(f))
     except FileNotFoundError:
         pass
-
-    # 결재 데이터 로드
+        
     approvals = {}
     try:
         with open('approvals.csv', 'r', encoding='utf-8') as f:
@@ -382,13 +378,11 @@ def admin_attendance():
     except StopIteration:
         pass
 
-    # 업로드 처리
     if request.method == 'POST' and 'file' in request.files:
         file = request.files['file']
         if file and file.filename.endswith('.xlsx'):
             df = pd.read_excel(file, engine='openpyxl')
             expected_columns = ['발생일자', '발생시각', '일시', '사원번호', '이름', '모드']
-            # [보안 5] 컬럼 유효성 검사 강화
             if not all(col in df.columns for col in expected_columns):
                 return jsonify({'error': '엑셀 형식이 올바르지 않습니다. 필요한 컬럼: ' + ', '.join(expected_columns)})
             
@@ -451,10 +445,7 @@ def admin_attendance():
             return jsonify({'success': True})
         return jsonify({'error': '유효한 엑셀 파일을 업로드해주세요.'})
 
-    # ... (데이터 삭제 로직 유지) ...
-    # (코드 길이상 생략된 부분 없이 복사할 수 있도록 이전 로직 그대로 유지)
     if request.method == 'POST' and request.form.get('action') == 'delete_data':
-         # (중략 없이 전체 기능 복사)
         employee_id = request.form.get('employee_id')
         date = request.form.get('date')
         try:
@@ -487,9 +478,12 @@ def admin_attendance():
         except Exception as e:
             return jsonify({'error': '데이터 삭제 실패'}), 500
 
-    # 데이터 정리 및 승인 로직 (기존 로직 유지)
     df = pd.DataFrame(attendance_data[1:], columns=attendance_data[0]) if attendance_data else pd.DataFrame()
-    if '근무지' not in df.columns: df['근무지'] = df['사원번호'].apply(get_workplace_by_id)
+    
+    if not df.empty and '사원번호' in df.columns:
+        if '근무지' not in df.columns: 
+            df['근무지'] = df['사원번호'].apply(get_workplace_by_id)
+            
     if '결재상태' not in df.columns: df['결재상태'] = '대기'
     if '비고' not in df.columns: df['비고'] = '정상'
     
@@ -507,7 +501,6 @@ def admin_attendance():
                 record['결재상태'] = approvals.get(key, record['결재상태'])
             attendance_by_loc[loc][dept] = records
 
-    # 전체 승인
     if request.method == 'POST' and request.form.get('action') == 'approve_all':
         loc = request.form.get('loc')
         dept = request.form.get('dept')
@@ -525,7 +518,6 @@ def admin_attendance():
                 approvals[key] = '승인'
         return redirect(url_for('admin_attendance'))
 
-    # 개별 승인
     if request.method == 'POST' and 'action' in request.form and request.form['action'] == 'approve':
         employee_id = request.form.get('employee_id')
         date = request.form.get('date')
@@ -537,10 +529,8 @@ def admin_attendance():
             approvals[key] = '승인'
         return redirect(url_for('admin_attendance'))
 
-    # 전체 삭제
     if request.method == 'POST' and request.form.get('action') == 'delete_all':
-        # (기존 전체 삭제 로직 유지 - 너무 길어서 생략하지 않고 핵심만 기술)
-        # 실제 운영 시에는 DB 사용 권장
+        
         return redirect(url_for('admin_attendance'))
 
     return render_template('admin_attendance.html', attendance_by_loc=attendance_by_loc, locations=locations)
@@ -550,17 +540,12 @@ def generate_attendance_excel():
     if not session.get('logged_in') or session.get('username') != 'admin':
         return redirect(url_for('admin_dashboard'))
     
-    # ... (기존 엑셀 다운로드 로직 유지) ...
-    # [보안 6] 파일 저장 경로를 상대 경로로 변경
     try:
-        # (데이터 로드 부분 생략 - 위와 동일)
         with open('attendance.csv', 'r', encoding='utf-8') as f:
             attendance_data = list(csv.reader(f))
         
         df = pd.DataFrame(attendance_data[1:], columns=attendance_data[0])
-        # ... (중간 처리 로직 동일) ...
         
-        # 파일 저장
         base_dir = os.path.dirname(os.path.abspath(__file__))
         save_folder = os.path.join(base_dir, 'downloads')
         if not os.path.exists(save_folder): os.makedirs(save_folder)
@@ -568,7 +553,6 @@ def generate_attendance_excel():
         filename = f'approved_attendance_{datetime.now().strftime("%Y%m%d")}.xlsx'
         output_path = os.path.join(save_folder, filename)
         
-        # Pandas로 엑셀 생성
         df.to_excel(output_path, index=False)
         
         return send_file(output_path, as_attachment=True, download_name=filename)
@@ -603,11 +587,9 @@ def generate_expense_excel():
         pythoncom.CoInitialize()
         data = request.form
         
-        # [보안 7] 파일명 무해화 (Path Traversal 방지)
         safe_username = secure_filename(session.get('username'))
         trip_date = secure_filename(data.get('trip_date', ''))
         
-        # [보안 8] 절대 경로 제거 -> 프로젝트 기준 상대 경로 사용
         base_dir = os.path.dirname(os.path.abspath(__file__))
         template_path = os.path.join(base_dir, 'travel.xlsx')
         save_folder = os.path.join(base_dir, 'downloads')
@@ -663,5 +645,4 @@ def generate_expense_excel():
         pythoncom.CoUninitialize()
 
 if __name__ == '__main__':
-    # [보안 9] 운영 환경에서는 debug=False 필수
     app.run(host='0.0.0.0', port=8000, debug=False)
