@@ -14,9 +14,7 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# [보안 2] 시크릿 키 검증 (없으면 에러 발생시켜 보안 사고 방지)
 if not os.getenv('FLASK_SECRET_KEY'):
-    # 로컬 테스트를 위해 .env가 없을 경우 임시 키 생성 (배포 시 필수 설정)
     app.secret_key = 'temporary-secret-key-for-dev'
     print("Warning: FLASK_SECRET_KEY not set. Using temporary key.")
 else:
@@ -365,7 +363,7 @@ def admin_attendance():
             attendance_data = list(csv.reader(f))
     except FileNotFoundError:
         pass
-        
+
     approvals = {}
     try:
         with open('approvals.csv', 'r', encoding='utf-8') as f:
@@ -383,6 +381,7 @@ def admin_attendance():
         if file and file.filename.endswith('.xlsx'):
             df = pd.read_excel(file, engine='openpyxl')
             expected_columns = ['발생일자', '발생시각', '일시', '사원번호', '이름', '모드']
+            # [보안 5] 컬럼 유효성 검사 강화
             if not all(col in df.columns for col in expected_columns):
                 return jsonify({'error': '엑셀 형식이 올바르지 않습니다. 필요한 컬럼: ' + ', '.join(expected_columns)})
             
@@ -530,7 +529,7 @@ def admin_attendance():
         return redirect(url_for('admin_attendance'))
 
     if request.method == 'POST' and request.form.get('action') == 'delete_all':
-        
+       
         return redirect(url_for('admin_attendance'))
 
     return render_template('admin_attendance.html', attendance_by_loc=attendance_by_loc, locations=locations)
@@ -541,6 +540,7 @@ def generate_attendance_excel():
         return redirect(url_for('admin_dashboard'))
     
     try:
+
         with open('attendance.csv', 'r', encoding='utf-8') as f:
             attendance_data = list(csv.reader(f))
         
@@ -645,4 +645,5 @@ def generate_expense_excel():
         pythoncom.CoUninitialize()
 
 if __name__ == '__main__':
+    
     app.run(host='0.0.0.0', port=8000, debug=False)
