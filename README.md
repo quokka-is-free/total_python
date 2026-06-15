@@ -1,3 +1,9 @@
+# total_python (출장비 및 근태 관리 시스템 현대화 프로젝트)
+
+![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)
+![Flask](https://img.shields.io/badge/flask-%23000.svg?style=for-the-badge&logo=flask&logoColor=white)
+![MySQL](https://img.shields.io/badge/mysql-%2300f.svg?style=for-the-badge&logo=mysql&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
 ## 프로젝트 배경 (Background & Motivation)
 이 프로젝트는 사내에서 장기간 운영되어 노후화된 **레거시 시스템(PowerBuilder 기반)**의 한계를 극복하고자 시작되었습니다.
 기존 C/S(Client-Server) 환경의 출장비 정산 및 근태 관리 프로그램을 **웹 기반(Web-based)으로 현대화(Modernization)** 하여 접근성을 높이고, 수기 계산의 비효율을 **API 연동 자동화**로 개선하기 위한 프로토타입입니다.
